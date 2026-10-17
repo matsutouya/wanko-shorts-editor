@@ -4,7 +4,7 @@ import type {Caption} from './captions';
 
 export type {Caption} from './captions';
 
-const FONT = 'Inter, -apple-system, system-ui, sans-serif';
+const FONT = '"Hiragino Kaku Gothic ProN", "Noto Sans JP", -apple-system, system-ui, sans-serif';
 const ACCENT = '#FFB020';
 
 // один блок субтитров (внутри своего Sequence)

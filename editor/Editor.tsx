@@ -46,17 +46,17 @@ function pollJob(
       s = await fetch(`${base}/${jobId}`).then((x) => x.json());
       netFails = 0;
     } catch {
-      if (++netFails > 5) { clearInterval(poll); onFail('Lost connection to the server'); }
+      if (++netFails > 5) { clearInterval(poll); onFail('サーバーとの接続が切れました'); }
       return;
     }
     if (s.status === 'running') {
       onProgress(s);
-      if (attempts > maxAttempts) { clearInterval(poll); onFail('Timed out'); }
+      if (attempts > maxAttempts) { clearInterval(poll); onFail('処理が時間切れになりました'); }
       return;
     }
     clearInterval(poll);
     if (s.status === 'done') onDone();
-    else onFail(s.error || (s.status === 'unknown' ? 'Job not found (server restarted?)' : 'Failed'));
+    else onFail(s.error || (s.status === 'unknown' ? '処理が見つかりません。サーバーが再起動した可能性があります' : '処理に失敗しました'));
   }, 1500);
 }
 
@@ -128,8 +128,8 @@ export const Editor: React.FC<{onBackToStart: () => void}> = ({onBackToStart}) =
         lastSeenUpdate.current = p.updatedAt;
         const st = useEditor.getState();
         st.init(META_RELOAD, p.captions ?? [], p.accentColor, p.clips ?? [], p.music ?? null, p.brolls ?? [], p.brollAssets ?? []);
-        st.setProjectInfo(projectId, p.name || 'Untitled project');
-        notify('Project updated from outside (Claude)', 'ok');
+        st.setProjectInfo(projectId, p.name || '無題のプロジェクト');
+        notify('Claudeによる変更を反映しました', 'ok');
       } catch { /* backend hiccup — try again next tick */ }
     }, 2000);
     return () => clearInterval(iv);
@@ -173,13 +173,13 @@ export const Editor: React.FC<{onBackToStart: () => void}> = ({onBackToStart}) =
   // rounded to tens so a screen reader isn't read a new number every 1.5 s.
   const tens = (label: string) => label.replace(/(\d+)%/g, (_, n) => `${Math.floor(Number(n) / 10) * 10}%`);
   const liveStatus =
-    exp?.status === 'running' ? `Rendering ${Math.floor((exp.progress ?? 0) / 10) * 10}%`
-    : exp?.status === 'done' ? 'Export ready'
-    : exp?.status === 'error' ? 'Export failed'
-    : arranging ? `Auto-arrange: ${tens(arrangeLabel)}`
-    : trimming ? `Autocut: ${tens(trimLabel)}`
-    : generating ? `Captions: ${tens(genLabel)}`
-    : brollGen ? `B-roll: ${tens(brollLabel)}`
+    exp?.status === 'running' ? `書き出し中 ${Math.floor((exp.progress ?? 0) / 10) * 10}%`
+    : exp?.status === 'done' ? '動画の書き出しが完了しました'
+    : exp?.status === 'error' ? '動画の書き出しに失敗しました'
+    : arranging ? `並べ替え中: ${tens(arrangeLabel)}`
+    : trimming ? `無音カット中: ${tens(trimLabel)}`
+    : generating ? `字幕を作成中: ${tens(genLabel)}`
+    : brollGen ? `追加映像を作成中: ${tens(brollLabel)}`
     : '';
 
   // sync playhead + play state from the player
@@ -232,25 +232,25 @@ export const Editor: React.FC<{onBackToStart: () => void}> = ({onBackToStart}) =
         async () => {
           const s = await fetch('/api/render/' + r.jobId).then((x) => x.json());
           setExp(s);
-          notify('Export ready', 'ok');
+          notify('動画の書き出しが完了しました', 'ok');
         },
-        (msg) => { setExp({status: 'error'}); notify('Export failed: ' + msg, 'error'); },
+        (msg) => { setExp({status: 'error'}); notify('動画の書き出しに失敗しました: ' + msg, 'error'); },
         2400, // renders can take a while — allow up to ~1h
       );
     } catch {
       setExp({status: 'error'});
-      notify('Could not start export', 'error');
+      notify('動画の書き出しを開始できませんでした', 'error');
     }
   };
 
   const generateCaptions = async () => {
     setGenerating(true);
-    setGenLabel('Starting…');
+    setGenLabel('開始中…');
     try {
       const {jobId} = await fetch('/api/captions', {method: 'POST', body: JSON.stringify({clips})}).then((x) => x.json());
       pollJob(
         '/api/captions', jobId,
-        (s) => setGenLabel(`${s.label ?? ''} ${s.progress ?? 0}%`),
+        (s) => setGenLabel(`${s.progress ?? 0}%`),
         async () => {
           const fresh = await fetch(`/captions.multi.json?_=${Date.now()}`).then((x) => x.json()).catch(() => []);
           // MERGE: keep existing captions (incl. manual edits) — but a clip only
@@ -271,59 +271,59 @@ export const Editor: React.FC<{onBackToStart: () => void}> = ({onBackToStart}) =
           pushHistory();
           setCaptions(merged);
           setGenerating(false);
-          notify(added.length ? `Captions ready (+${added.length})` : 'Captions up to date', 'ok');
+          notify(added.length ? `字幕を${added.length}件追加しました` : '字幕は更新済みです', 'ok');
         },
-        (msg) => { setGenerating(false); notify('Captions failed: ' + msg, 'error'); },
+        (msg) => { setGenerating(false); notify('字幕の作成に失敗しました: ' + msg, 'error'); },
       );
     } catch {
       setGenerating(false);
-      notify('Could not start caption generation', 'error');
+      notify('字幕の作成を開始できませんでした', 'error');
     }
   };
 
   const generateBroll = async () => {
     setBrollGen(true);
-    setBrollLabel('Starting…');
+    setBrollLabel('開始中…');
     try {
       const {jobId} = await fetch('/api/broll', {method: 'POST', body: JSON.stringify({clips, brollAssets})}).then((x) => x.json());
       pollJob(
         '/api/broll', jobId,
-        (s) => setBrollLabel(`${s.label ?? ''} ${s.progress ?? 0}%`),
+        (s) => setBrollLabel(`${s.progress ?? 0}%`),
         async () => {
           const items = await fetch(`/broll.json?_=${Date.now()}`).then((x) => x.json()).catch(() => []);
           setBrolls(Array.isArray(items) ? items : []);
           setBrollGen(false);
-          notify(`B-roll ready (${Array.isArray(items) ? items.length : 0} cues)`, 'ok');
+          notify(`追加映像を${Array.isArray(items) ? items.length : 0}件用意しました`, 'ok');
         },
-        (msg) => { setBrollGen(false); notify('B-roll failed: ' + msg, 'error'); },
+        (msg) => { setBrollGen(false); notify('追加映像の作成に失敗しました: ' + msg, 'error'); },
       );
     } catch {
       setBrollGen(false);
-      notify('Could not start B-roll', 'error');
+      notify('追加映像の作成を開始できませんでした', 'error');
     }
   };
 
   // Auto-trim leading/trailing silence on every clip (uses cached transcripts).
   const trimSilence = async () => {
     setTrimming(true);
-    setTrimLabel('Starting…');
+    setTrimLabel('開始中…');
     try {
       const {jobId} = await fetch('/api/trim-silence', {method: 'POST', body: JSON.stringify({clips})}).then((x) => x.json());
       pollJob(
         '/api/trim-silence', jobId,
-        (s) => setTrimLabel(`${s.label ?? ''} ${s.progress ?? 0}%`),
+        (s) => setTrimLabel(`${s.progress ?? 0}%`),
         async () => {
           const {plan} = await fetch(`/trim-silence.json?_=${Date.now()}`).then((x) => x.json()).catch(() => ({plan: null}));
           if (Array.isArray(plan) && plan.length) applyAutocut(plan);
           setTrimming(false);
           const cuts = Array.isArray(plan) ? plan.reduce((n, p) => n + (p.segments?.length ?? 0), 0) : 0;
-          notify(Array.isArray(plan) && plan.length ? `Autocut — ${plan.length} clip(s) → ${cuts} segment(s)` : 'Nothing to cut', 'ok');
+          notify(Array.isArray(plan) && plan.length ? `無音カット: ${plan.length}本の動画から${cuts}区間を作成しました` : 'カットする無音部分はありませんでした', 'ok');
         },
-        (msg) => { setTrimming(false); notify('Autocut failed: ' + msg, 'error'); },
+        (msg) => { setTrimming(false); notify('無音カットに失敗しました: ' + msg, 'error'); },
       );
     } catch {
       setTrimming(false);
-      notify('Could not start silence trim', 'error');
+      notify('無音カットを開始できませんでした', 'error');
     }
   };
 
@@ -331,30 +331,30 @@ export const Editor: React.FC<{onBackToStart: () => void}> = ({onBackToStart}) =
   // Transcripts are cached, so Generate Captions afterwards won't re-transcribe.
   const arrangeClips = async () => {
     setArranging(true);
-    setArrangeLabel('Starting…');
+    setArrangeLabel('開始中…');
     try {
       const {jobId} = await fetch('/api/arrange', {method: 'POST', body: JSON.stringify({clips})}).then((x) => x.json());
       pollJob(
         '/api/arrange', jobId,
-        (s) => setArrangeLabel(`${s.label ?? ''} ${s.progress ?? 0}%`),
+        (s) => setArrangeLabel(`${s.progress ?? 0}%`),
         async () => {
           const {order, best} = await fetch(`/clip-order.json?_=${Date.now()}`).then((x) => x.json()).catch(() => ({order: null, best: null}));
           setArranging(false);
-          if (!Array.isArray(order)) { notify('Arrange failed', 'error'); return; }
+          if (!Array.isArray(order)) { notify('自動並べ替えに失敗しました', 'error'); return; }
           setClipOrder(order); // reorder only (keep all) — pushes its own history
           const removeIds = Array.isArray(best) ? order.filter((id: string) => !best.includes(id)) : [];
           setDupSuggestion(removeIds); // non-destructive: user confirms in the banner
-          notify(removeIds.length ? `Arranged — ${removeIds.length} duplicate take(s) can be removed` : 'Clips arranged', 'ok');
+          notify(removeIds.length ? `並べ替えました。重複候補が${removeIds.length}件あります` : '動画を並べ替えました', 'ok');
         },
-        (msg) => { setArranging(false); notify('Arrange failed: ' + msg, 'error'); },
+        (msg) => { setArranging(false); notify('自動並べ替えに失敗しました: ' + msg, 'error'); },
       );
     } catch {
       setArranging(false);
-      notify('Could not start auto-arrange', 'error');
+      notify('自動並べ替えを開始できませんでした', 'error');
     }
   };
 
-  if (!meta) return <Center>Loading…</Center>;
+  if (!meta) return <Center>読み込み中…</Center>;
 
   const totalSec = meta.durationInFrames / meta.fps;
   const nowMs = (currentFrame / meta.fps) * 1000;
@@ -512,80 +512,80 @@ export const Editor: React.FC<{onBackToStart: () => void}> = ({onBackToStart}) =
       {/* Top bar */}
       <header className="bg-surface-container border-b border-outline-variant flex justify-between items-center h-12 px-4 z-50 shrink-0">
         <div className="flex items-center gap-3">
-          <h1 className="sr-only">AutoBroll editor</h1>
-          <button type="button" onClick={onBackToStart} aria-label="Back to projects" title="Back to projects" className="flex items-center gap-1 text-on-surface-variant hover:text-on-surface transition-colors">
+          <h1 className="sr-only">わんこショート編集</h1>
+          <button type="button" onClick={onBackToStart} aria-label="プロジェクト一覧に戻る" title="プロジェクト一覧に戻る" className="flex items-center gap-1 text-on-surface-variant hover:text-on-surface transition-colors">
             <span aria-hidden="true" className="material-symbols-outlined text-[20px]">arrow_back</span>
-            <span className="text-headline-md font-headline-md font-bold">AutoBroll</span>
+            <span className="text-headline-md font-headline-md font-bold">わんこショート編集</span>
           </button>
           <div aria-hidden="true" className="h-4 w-px bg-outline-variant" />
           <input
-            aria-label="Project name"
+            aria-label="プロジェクト名"
             value={projectName}
             onChange={(e) => setProjectName(e.target.value)}
             className="bg-transparent text-primary font-bold text-body-md border-b border-transparent focus:border-primary px-1 max-w-[220px]"
-            placeholder="Untitled project"
+            placeholder="無題のプロジェクト"
           />
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 mr-2">
-            <IconButton icon="undo" size={20} label="Undo (Ctrl+Z)" onClick={undo} disabled={!past.length} className="p-1.5 rounded-lg hover:bg-surface-variant transition-colors text-on-surface-variant disabled:opacity-30" />
-            <IconButton icon="redo" size={20} label="Redo (Ctrl+Shift+Z)" onClick={redo} disabled={!future.length} className="p-1.5 rounded-lg hover:bg-surface-variant transition-colors text-on-surface-variant disabled:opacity-30" />
+            <IconButton icon="undo" size={20} label="元に戻す (Ctrl+Z)" onClick={undo} disabled={!past.length} className="p-1.5 rounded-lg hover:bg-surface-variant transition-colors text-on-surface-variant disabled:opacity-30" />
+            <IconButton icon="redo" size={20} label="やり直す (Ctrl+Shift+Z)" onClick={redo} disabled={!future.length} className="p-1.5 rounded-lg hover:bg-surface-variant transition-colors text-on-surface-variant disabled:opacity-30" />
           </div>
           <button
             type="button"
             onClick={arrangeClips}
             disabled={arranging || clips.length < 2}
             aria-busy={arranging}
-            title="Let AI listen and order the clips"
+            title="話し声を解析して動画を並べ替えます"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-variant disabled:opacity-40 transition-colors text-body-md font-bold"
           >
             <span aria-hidden="true" className={`material-symbols-outlined text-[18px] ${arranging ? 'animate-spin' : ''}`}>{arranging ? 'progress_activity' : 'sort'}</span>
-            {arranging ? (arrangeLabel || 'Arranging…') : 'Auto-arrange'}
+            {arranging ? (arrangeLabel || '並べ替え中…') : '音声で並べ替え'}
           </button>
           <button
             type="button"
             onClick={trimSilence}
             disabled={trimming || !clips.length}
             aria-busy={trimming}
-            title="Cut silence at the ends AND long pauses inside every clip"
+            title="動画内の無音部分をカットします"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-variant disabled:opacity-40 transition-colors text-body-md font-bold"
           >
             <span aria-hidden="true" className={`material-symbols-outlined text-[18px] ${trimming ? 'animate-spin' : ''}`}>{trimming ? 'progress_activity' : 'cut'}</span>
-            {trimming ? (trimLabel || 'Cutting…') : 'Autocut'}
+            {trimming ? (trimLabel || 'カット中…') : '無音カット'}
           </button>
-          {exp?.status === 'running' && <span aria-hidden="true" className="text-body-sm text-on-surface-variant">Rendering… {exp.progress ?? 0}%</span>}
-          {exp?.status === 'done' && exp.file && <a href={exp.file} download className="text-body-sm text-[#39d98a]">↓ Download mp4</a>}
-          {exp?.status === 'error' && <span className="text-body-sm text-error">Render error</span>}
+          {exp?.status === 'running' && <span aria-hidden="true" className="text-body-sm text-on-surface-variant">書き出し中… {exp.progress ?? 0}%</span>}
+          {exp?.status === 'done' && exp.file && <a href={exp.file} download className="text-body-sm text-[#39d98a]">↓ 動画を保存</a>}
+          {exp?.status === 'error' && <span className="text-body-sm text-error">書き出しエラー</span>}
           <button
             type="button"
             onClick={() => exportVideo(true)}
             disabled={exp?.status === 'running'}
-            title="Half resolution, fastest encode — for a quick check (~40% faster)"
+            title="確認用の低解像度動画を作ります"
             className="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-variant disabled:opacity-40 transition-colors text-body-md font-bold"
           >
-            Draft
+            確認用
           </button>
           <button type="button" onClick={() => exportVideo(false)} disabled={exp?.status === 'running'} className="bg-primary-container text-on-primary-container px-4 py-1.5 rounded-lg font-bold text-body-md hover:brightness-110 active:scale-95 disabled:opacity-40 transition-all">
-            Export mp4
+            MP4を書き出す
           </button>
         </div>
       </header>
 
       {/* Auto-arrange duplicate-removal suggestion (non-destructive until confirmed) */}
       {dupSuggestion.length > 0 && (
-        <div role="region" aria-label="Duplicate takes suggestion" className="flex items-center justify-between gap-3 px-4 py-2 bg-primary-container/20 border-b border-primary/30 text-body-md shrink-0">
+        <div role="region" aria-label="重複動画の提案" className="flex items-center justify-between gap-3 px-4 py-2 bg-primary-container/20 border-b border-primary/30 text-body-md shrink-0">
           <span className="text-on-surface">
             <span aria-hidden="true" className="material-symbols-outlined text-[16px] align-middle mr-1 text-primary">auto_awesome</span>
-            AI grouped your takes — remove <b>{dupSuggestion.length}</b> duplicate take(s), keeping the best of each? (⌘Z undoes)
+            AIが<b>{dupSuggestion.length}</b>件の重複候補を見つけました。削除しますか？元に戻すこともできます。
           </span>
           <div className="flex items-center gap-2 shrink-0">
-            <button type="button" onClick={() => setDupSuggestion([])} className="px-3 py-1 rounded-lg text-on-surface-variant hover:bg-surface-variant font-bold">Keep all (Esc)</button>
+            <button type="button" onClick={() => setDupSuggestion([])} className="px-3 py-1 rounded-lg text-on-surface-variant hover:bg-surface-variant font-bold">すべて残す (Esc)</button>
             <button
               type="button"
-              onClick={() => { const n = dupSuggestion.length; removeClips(dupSuggestion); notify(`Removed ${n} duplicate take(s)`, 'ok'); }}
+              onClick={() => { const n = dupSuggestion.length; removeClips(dupSuggestion); notify(`重複候補を${n}件削除しました`, 'ok'); }}
               className="px-3 py-1 rounded-lg bg-primary-container text-on-primary-container font-bold hover:brightness-110"
             >
-              Remove duplicates
+              重複候補を削除
             </button>
           </div>
         </div>
@@ -595,7 +595,7 @@ export const Editor: React.FC<{onBackToStart: () => void}> = ({onBackToStart}) =
         <AssetsSidebar playerRef={playerRef} />
 
         {/* Preview + transport */}
-        <section aria-label="Preview" className="flex-1 bg-surface-dim flex flex-col min-w-0">
+        <section aria-label="プレビュー" className="flex-1 bg-surface-dim flex flex-col min-w-0">
           <div className="flex-1 flex items-center justify-center p-6 min-h-0">
             <div className="relative h-full" style={{aspectRatio: `${meta.width} / ${meta.height}`}}>
               <Player
@@ -621,7 +621,7 @@ export const Editor: React.FC<{onBackToStart: () => void}> = ({onBackToStart}) =
                   <div
                     aria-hidden="true"
                     onPointerDown={startResize}
-                    title="Drag to resize"
+                    title="ドラッグして大きさを変える"
                     className="absolute z-30 w-4 h-4 -ml-2 -mt-2 bg-primary border-2 border-white rounded-sm cursor-nwse-resize hover:scale-110 transition-transform"
                     style={{left: boxRect.left + boxRect.w, top: boxRect.top + boxRect.h}}
                   />
@@ -634,33 +634,33 @@ export const Editor: React.FC<{onBackToStart: () => void}> = ({onBackToStart}) =
                   type="button"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={toggleKeyframe}
-                  aria-label="Add or remove a keyframe at the playhead"
-                  title="Add/remove a keyframe at the playhead (then move + resize to animate)"
+                  aria-label="再生位置にキーフレームを追加または削除"
+                  title="再生位置にキーフレームを追加または削除します"
                   className="absolute z-30 top-2 left-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-container-high/95 border border-outline-variant text-on-surface text-body-sm font-bold hover:bg-surface-variant"
                 >
                   <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-primary" style={{fontVariationSettings: "'FILL' 1"}}>diamond</span>
-                  Keyframe
+                  キーフレーム
                 </button>
               )}
             </div>
           </div>
 
           {/* transport */}
-          <div role="group" aria-label="Transport" className="h-14 bg-surface-container-low border-t border-outline-variant flex items-center justify-between px-6 shrink-0">
-            <span aria-label={`Playhead at ${fmt(currentFrame / meta.fps)} of ${fmt(totalSec)}`} className="font-mono text-mono-label text-primary">{fmt(currentFrame / meta.fps)} / {fmt(totalSec)}</span>
+          <div role="group" aria-label="再生操作" className="h-14 bg-surface-container-low border-t border-outline-variant flex items-center justify-between px-6 shrink-0">
+            <span aria-label={`再生位置 ${fmt(currentFrame / meta.fps)} / ${fmt(totalSec)}`} className="font-mono text-mono-label text-primary">{fmt(currentFrame / meta.fps)} / {fmt(totalSec)}</span>
             <div className="flex items-center gap-6">
-              <IconButton icon="skip_previous" size={24} label="Previous clip" onClick={() => skip(-1)} className="text-on-surface-variant hover:text-primary transition-colors" />
+              <IconButton icon="skip_previous" size={24} label="前の動画へ" onClick={() => skip(-1)} className="text-on-surface-variant hover:text-primary transition-colors" />
               <IconButton
                 icon={playing ? 'pause' : 'play_arrow'}
                 size={26}
                 fill
-                label={playing ? 'Pause (Space)' : 'Play (Space)'}
+                label={playing ? '一時停止 (Space)' : '再生 (Space)'}
                 onClick={() => playerRef.current?.toggle()}
                 className="w-10 h-10 rounded-full bg-on-surface text-surface hover:scale-105 active:scale-95 transition-all"
               />
-              <IconButton icon="skip_next" size={24} label="Next clip" onClick={() => skip(1)} className="text-on-surface-variant hover:text-primary transition-colors" />
+              <IconButton icon="skip_next" size={24} label="次の動画へ" onClick={() => skip(1)} className="text-on-surface-variant hover:text-primary transition-colors" />
             </div>
-            <IconButton icon="fullscreen" size={20} label="Fullscreen preview" onClick={() => playerRef.current?.requestFullscreen()} className="text-on-surface-variant hover:text-primary transition-colors" />
+            <IconButton icon="fullscreen" size={20} label="プレビューを全画面表示" onClick={() => playerRef.current?.requestFullscreen()} className="text-on-surface-variant hover:text-primary transition-colors" />
           </div>
         </section>
 
@@ -676,7 +676,7 @@ export const Editor: React.FC<{onBackToStart: () => void}> = ({onBackToStart}) =
       </main>
 
       {/* Timeline */}
-      <footer aria-label="Timeline" className="bg-surface-container-lowest border-t border-outline-variant z-50 shrink-0" style={{height: 300}}>
+      <footer aria-label="タイムライン" className="bg-surface-container-lowest border-t border-outline-variant z-50 shrink-0" style={{height: 300}}>
         <Timeline playerRef={playerRef} />
       </footer>
     </div>

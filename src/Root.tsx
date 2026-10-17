@@ -24,11 +24,11 @@ export const RemotionRoot: React.FC = () => {
             ? {clips: p.clips, music: p.music ?? null}
             : await fetch(staticFile('timeline.json')).then((r) => r.json()).catch(() => ({clips: [], music: null}));
         const captions =
-          Array.isArray(p.captions) && p.captions.length
+          Array.isArray(p.captions)
             ? p.captions
             : await fetch(staticFile('captions.multi.json')).then((r) => r.json()).catch(() => []);
         const brolls =
-          Array.isArray(p.brolls) && p.brolls.length
+          Array.isArray(p.brolls)
             ? p.brolls
             : await fetch(staticFile('broll.json')).then((r) => r.json()).catch(() => []);
         return {

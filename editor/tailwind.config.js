@@ -3,7 +3,7 @@
 // (stitch_custom_editing_studio). Pro video-editor theme: near-black surfaces,
 // electric-purple primary, orange caption accents, blue audio accents.
 export default {
-  content: ['./index.html', './**/*.{ts,tsx}'],
+  content: ['./editor/index.html', './editor/**/*.{ts,tsx}', './src/**/*.{ts,tsx}'],
   darkMode: 'class',
   theme: {
     extend: {

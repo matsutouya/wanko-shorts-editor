@@ -24,7 +24,7 @@ export const AssetsSidebar: React.FC<{playerRef: React.RefObject<PlayerRef | nul
   const importFiles = async (files: File[]) => {
     const vids = files.filter((f) => f.type.startsWith('video/') || /\.(mp4|mov|m4v|webm|mkv)$/i.test(f.name));
     for (let i = 0; i < vids.length; i++) {
-      setImporting(`Importing ${vids[i].name} (${i + 1}/${vids.length})…`);
+      setImporting(`読み込み中: ${vids[i].name} (${i + 1}/${vids.length})…`);
       try {
         const clip = await fetch('/api/add-clip?name=' + encodeURIComponent(vids[i].name), {method: 'POST', body: vids[i]}).then((r) => r.json());
         if (clip?.id) addClip(clip);
@@ -55,7 +55,7 @@ export const AssetsSidebar: React.FC<{playerRef: React.RefObject<PlayerRef | nul
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
       const kind = f.type.startsWith('image/') || /\.(jpg|jpeg|png|webp|heic)$/i.test(f.name) ? 'image' : 'video';
-      setBrollBusy(`Adding ${f.name} (${i + 1}/${files.length})…`);
+      setBrollBusy(`追加中: ${f.name} (${i + 1}/${files.length})…`);
       try {
         const a = await fetch(`/api/add-broll-asset?name=${encodeURIComponent(f.name)}&kind=${kind}`, {method: 'POST', body: f}).then((r) => r.json());
         if (a?.id) addBrollAsset(a);
@@ -76,16 +76,16 @@ export const AssetsSidebar: React.FC<{playerRef: React.RefObject<PlayerRef | nul
 
   return (
     <aside
-      aria-label="Assets"
+      aria-label="素材"
       onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
       onDragLeave={() => setDragOver(false)}
       onDrop={onDrop}
       className={`w-64 bg-surface-container-low border-r flex flex-col h-full shrink-0 relative ${dragOver ? 'border-primary' : 'border-outline-variant'}`}
     >
-      <input ref={clipInput} type="file" accept="video/*" multiple onChange={onPickClips} className="hidden" aria-label="Choose video clips" />
+      <input ref={clipInput} type="file" accept="video/*" multiple onChange={onPickClips} className="hidden" aria-label="動画を選ぶ" />
       <div className="p-4 border-b border-outline-variant flex justify-between items-center">
-        <h2 className="text-label-bold font-label-bold uppercase tracking-wider text-on-surface-variant">Assets</h2>
-        <IconButton icon="add_circle" size={20} label="Add video clips" onClick={() => clipInput.current?.click()} className="text-primary hover:brightness-125" />
+        <h2 className="text-label-bold font-label-bold uppercase tracking-wider text-on-surface-variant">素材</h2>
+        <IconButton icon="add_circle" size={20} label="動画を追加" onClick={() => clipInput.current?.click()} className="text-primary hover:brightness-125" />
       </div>
 
       {/* import progress — announced */}
@@ -95,7 +95,7 @@ export const AssetsSidebar: React.FC<{playerRef: React.RefObject<PlayerRef | nul
       </div>
       {dragOver && (
         <div aria-hidden="true" className="absolute inset-0 bg-primary-container/20 border-2 border-dashed border-primary z-20 flex items-center justify-center pointer-events-none">
-          <span className="text-primary font-bold text-body-md">Drop videos to import</span>
+          <span className="text-primary font-bold text-body-md">ここに動画をドロップ</span>
         </div>
       )}
 
@@ -103,8 +103,8 @@ export const AssetsSidebar: React.FC<{playerRef: React.RefObject<PlayerRef | nul
         {/* Video clips */}
         <section aria-labelledby="assets-clips-heading">
           <div className="flex items-center justify-between mb-3">
-            <h3 id="assets-clips-heading" className="text-label-bold font-label-bold text-on-surface-variant uppercase tracking-wider">Video clips</h3>
-            <IconButton icon="add" size={16} label="Add video clips" onClick={() => clipInput.current?.click()} className="text-on-surface-variant hover:text-primary" />
+            <h3 id="assets-clips-heading" className="text-label-bold font-label-bold text-on-surface-variant uppercase tracking-wider">動画クリップ</h3>
+            <IconButton icon="add" size={16} label="動画を追加" onClick={() => clipInput.current?.click()} className="text-on-surface-variant hover:text-primary" />
           </div>
           <div className="grid grid-cols-1 gap-2">
             {placed.map(({clip, startMs}) => {
@@ -138,22 +138,22 @@ export const AssetsSidebar: React.FC<{playerRef: React.RefObject<PlayerRef | nul
                 </button>
               );
             })}
-            {!clips.length && <p className="text-body-sm text-on-surface-variant/75">No clips loaded.</p>}
+            {!clips.length && <p className="text-body-sm text-on-surface-variant/75">動画がありません。</p>}
           </div>
         </section>
 
         {/* Audio */}
         <section aria-labelledby="assets-audio-heading">
-          <h3 id="assets-audio-heading" className="text-label-bold font-label-bold mb-3 text-on-surface-variant uppercase tracking-wider">Audio</h3>
-          <input ref={musicInput} type="file" accept="audio/*" onChange={onPickMusic} className="hidden" aria-label="Choose a music file" />
+          <h3 id="assets-audio-heading" className="text-label-bold font-label-bold mb-3 text-on-surface-variant uppercase tracking-wider">音楽</h3>
+          <input ref={musicInput} type="file" accept="audio/*" onChange={onPickMusic} className="hidden" aria-label="音楽ファイルを選ぶ" />
           {music ? (
             <div className="bg-surface-variant/30 p-2 rounded flex items-center gap-3 border border-outline-variant/30">
               <span aria-hidden="true" className="material-symbols-outlined text-secondary">audiotrack</span>
               <div className="flex-1 min-w-0">
                 <p className="text-body-sm font-medium truncate">{music.src.split('/').pop()}</p>
-                <p className="text-[10px] text-on-surface-variant font-mono">vol {Math.round(music.volume * 100)}%</p>
+                <p className="text-[10px] text-on-surface-variant font-mono">音量 {Math.round(music.volume * 100)}%</p>
               </div>
-              <IconButton icon="close" label="Remove music" onClick={() => setMusic(null)} className="text-on-surface-variant hover:text-error" />
+              <IconButton icon="close" label="音楽を削除" onClick={() => setMusic(null)} className="text-on-surface-variant hover:text-error" />
             </div>
           ) : (
             <button
@@ -162,7 +162,7 @@ export const AssetsSidebar: React.FC<{playerRef: React.RefObject<PlayerRef | nul
               className="w-full bg-surface-variant/20 p-2 rounded flex items-center gap-3 border border-dashed border-outline-variant/40 hover:border-primary-container transition-colors text-on-surface-variant"
             >
               <span aria-hidden="true" className="material-symbols-outlined text-secondary">library_music</span>
-              <span className="text-body-sm">Add music…</span>
+              <span className="text-body-sm">音楽を追加…</span>
             </button>
           )}
         </section>
@@ -170,10 +170,10 @@ export const AssetsSidebar: React.FC<{playerRef: React.RefObject<PlayerRef | nul
         {/* B-roll assets (own footage/photos for the generator to pick from) */}
         <section aria-labelledby="assets-broll-heading">
           <div className="flex items-center justify-between mb-3">
-            <h3 id="assets-broll-heading" className="text-label-bold font-label-bold text-on-surface-variant uppercase tracking-wider">B-roll assets</h3>
-            <IconButton icon="add" size={16} label="Add your own B-roll footage or photos" onClick={() => brollInput.current?.click()} className="text-on-surface-variant hover:text-primary" />
+            <h3 id="assets-broll-heading" className="text-label-bold font-label-bold text-on-surface-variant uppercase tracking-wider">追加素材</h3>
+            <IconButton icon="add" size={16} label="動画や写真を追加" onClick={() => brollInput.current?.click()} className="text-on-surface-variant hover:text-primary" />
           </div>
-          <input ref={brollInput} type="file" accept="video/*,image/*" multiple onChange={onPickBroll} className="hidden" aria-label="Choose B-roll footage or photos" />
+          <input ref={brollInput} type="file" accept="video/*,image/*" multiple onChange={onPickBroll} className="hidden" aria-label="追加素材の動画や写真を選ぶ" />
           <p role="status" aria-live="polite" className={brollBusy ? 'text-[11px] text-primary mb-2 truncate' : 'sr-only'}>{brollBusy ?? ''}</p>
           {brollAssets.length ? (
             <ul className="grid grid-cols-3 gap-2 list-none m-0 p-0">
@@ -184,7 +184,7 @@ export const AssetsSidebar: React.FC<{playerRef: React.RefObject<PlayerRef | nul
                   <IconButton
                     icon="close"
                     size={14}
-                    label={`Remove ${a.label}`}
+                    label={`${a.label}を削除`}
                     onClick={() => removeBrollAsset(a.id)}
                     className="absolute top-0.5 right-0.5 w-5 h-5 rounded bg-surface-container-lowest/80 text-on-surface-variant hover:text-error opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                   />
@@ -194,10 +194,10 @@ export const AssetsSidebar: React.FC<{playerRef: React.RefObject<PlayerRef | nul
           ) : (
             <button type="button" onClick={() => brollInput.current?.click()} className="w-full bg-surface-variant/20 p-2 rounded flex items-center gap-2 border border-dashed border-outline-variant/40 hover:border-primary-container text-on-surface-variant text-body-sm">
               <span aria-hidden="true" className="material-symbols-outlined text-secondary text-[18px]">perm_media</span>
-              Add your footage…
+              動画や写真を追加…
             </button>
           )}
-          <p className="text-[10px] text-on-surface-variant/75 mt-2">Auto B-roll prefers these; falls back to Pexels.</p>
+          <p className="text-[10px] text-on-surface-variant/75 mt-2">AI素材追加ではここにある素材を優先します。</p>
         </section>
       </div>
     </aside>

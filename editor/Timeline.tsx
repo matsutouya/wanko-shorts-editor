@@ -36,7 +36,7 @@ const keyActivate = (fn: () => void) => (e: React.KeyboardEvent<HTMLElement>) =>
     fn();
   }
 };
-const secs = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+const secs = (ms: number) => `${(ms / 1000).toFixed(1)}秒`;
 
 // audio waveform (centered bars), stretched to the parent box
 const Wave: React.FC<{peaks: number[]; color?: string}> = ({peaks, color = 'rgba(255,255,255,0.55)'}) => {
@@ -200,16 +200,16 @@ export const Timeline: React.FC<{playerRef: React.RefObject<PlayerRef | null>}> 
       {/* toolbar */}
       <div className="h-10 border-b border-outline-variant flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-3 text-on-surface-variant">
-          <IconButton icon="content_cut" label="Split clip at playhead (S)" onClick={() => splitClipAtFrame(currentFrame)} className="hover:text-on-surface transition-colors" />
-          <IconButton icon="delete" label="Delete selected clip (Delete)" onClick={deleteSelected} disabled={!selectedClipId} className="hover:text-on-surface transition-colors disabled:opacity-40" />
+          <IconButton icon="content_cut" label="再生位置で動画を分割 (S)" onClick={() => splitClipAtFrame(currentFrame)} className="hover:text-on-surface transition-colors" />
+          <IconButton icon="delete" label="選択した動画を削除 (Delete)" onClick={deleteSelected} disabled={!selectedClipId} className="hover:text-on-surface transition-colors disabled:opacity-40" />
           <div aria-hidden="true" className="h-4 w-px bg-outline-variant mx-1" />
-          <IconButton icon="zoom_out" label="Zoom out" onClick={() => setPxPerSec((p) => Math.max(20, p - 20))} disabled={pxPerSec <= 20} className="hover:text-on-surface transition-colors disabled:opacity-40" />
-          <IconButton icon="zoom_in" label="Zoom in" onClick={() => setPxPerSec((p) => Math.min(220, p + 20))} disabled={pxPerSec >= 220} className="hover:text-on-surface transition-colors disabled:opacity-40" />
+          <IconButton icon="zoom_out" label="表示を縮小" onClick={() => setPxPerSec((p) => Math.max(20, p - 20))} disabled={pxPerSec <= 20} className="hover:text-on-surface transition-colors disabled:opacity-40" />
+          <IconButton icon="zoom_in" label="表示を拡大" onClick={() => setPxPerSec((p) => Math.min(220, p + 20))} disabled={pxPerSec >= 220} className="hover:text-on-surface transition-colors disabled:opacity-40" />
         </div>
         <div className="flex gap-4 text-mono-label font-mono text-on-surface-variant">
-          <span aria-label={`Playhead at ${fmt(currentFrame / fps)} of ${fmt(totalSec)}`}>Timeline: {fmt(currentFrame / fps)} / {fmt(totalSec)}</span>
+          <span aria-label={`再生位置 ${fmt(currentFrame / fps)} / ${fmt(totalSec)}`} >タイムライン: {fmt(currentFrame / fps)} / {fmt(totalSec)}</span>
           <span>{meta.width}×{meta.height}</span>
-          <span aria-live="polite">Zoom: {Math.round((pxPerSec / 70) * 100)}%</span>
+          <span aria-live="polite" >拡大率: {Math.round((pxPerSec / 70) * 100)}%</span>
         </div>
       </div>
 
@@ -218,7 +218,7 @@ export const Timeline: React.FC<{playerRef: React.RefObject<PlayerRef | null>}> 
         {/* label column (visual only — each track is a named group below) */}
         <div aria-hidden="true" className="flex flex-col border-r border-outline-variant bg-surface-container-lowest z-10 shrink-0" style={{width: LABELS_W}}>
           <div className="h-6 border-b border-outline-variant/30" />
-          {['Captions', 'Video', 'B-roll', 'Audio'].map((l) => (
+          {['字幕', '動画', '追加映像', '音楽'].map((l) => (
             <div key={l} className="flex items-center px-4 border-b border-outline-variant/30" style={{height: TRACK_H}}>
               <span className="text-[10px] font-label-bold uppercase tracking-wider text-on-surface-variant">{l}</span>
             </div>
@@ -229,7 +229,7 @@ export const Timeline: React.FC<{playerRef: React.RefObject<PlayerRef | null>}> 
         <div
           ref={canvasRef}
           role="region"
-          aria-label="Timeline. Arrow keys move the playhead, Tab reaches the blocks, S splits, Delete removes the selected clip"
+          aria-label="タイムライン。矢印キーで再生位置を移動、Tabで素材を選択、Sで分割、Deleteで選択した動画を削除"
           tabIndex={0}
           className="flex-1 overflow-x-auto relative timeline-grid focus-visible:outline-offset-[-2px]"
         >
@@ -239,7 +239,7 @@ export const Timeline: React.FC<{playerRef: React.RefObject<PlayerRef | null>}> 
               {ruler.map((_, s) =>
                 s % tickStep === 0 ? (
                   <span key={s} className="absolute text-[9px] font-mono text-on-surface-variant/75 border-l border-outline-variant/30 pl-1" style={{left: s * pxPerSec, top: 6}}>
-                    {s}s
+                    {s}秒
                   </span>
                 ) : null,
               )}
@@ -251,7 +251,7 @@ export const Timeline: React.FC<{playerRef: React.RefObject<PlayerRef | null>}> 
             </div>
 
             {/* Captions track (anchored to clips — follow trims/reorders) */}
-            <Track label="Captions track">
+            <Track label="字幕トラック">
               {projCaps.map((c) => {
                 const sel = c.id === selectedId;
                 const text = c.words.map((w) => w.text).join(' ');
@@ -262,7 +262,7 @@ export const Timeline: React.FC<{playerRef: React.RefObject<PlayerRef | null>}> 
                     role="button"
                     tabIndex={0}
                     aria-pressed={sel}
-                    aria-label={`Caption at ${secs(c.startMs)}: ${text}`}
+                    aria-label={`字幕 ${secs(c.startMs)}: ${text}`}
                     data-timeline-block
                     onPointerDown={(e) => { e.stopPropagation(); pick(); }}
                     onKeyDown={keyActivate(pick)}
@@ -279,7 +279,7 @@ export const Timeline: React.FC<{playerRef: React.RefObject<PlayerRef | null>}> 
             </Track>
 
             {/* Video track (clips) */}
-            <Track label="Video track">
+            <Track label="動画トラック">
               {placed.map(({clip, startMs}) => {
                 const sel = clip.id === selectedClipId;
                 const dup = dupSuggestion.includes(clip.id);
@@ -287,10 +287,10 @@ export const Timeline: React.FC<{playerRef: React.RefObject<PlayerRef | null>}> 
                 const name = clip.label ?? clip.id;
                 const pick = () => { selectClip(clip.id); seekFrame((startMs / 1000) * fps + 1); };
                 const description = [
-                  `Clip ${name}, ${clipDurationSec(clip).toFixed(1)}s at ${secs(startMs)}`,
-                  clip.muted ? 'muted' : '',
-                  speed !== 1 ? `${speed}× speed` : '',
-                  dup ? 'duplicate take, will be removed' : '',
+                  `動画 ${name}、${clipDurationSec(clip).toFixed(1)}秒、開始${secs(startMs)}`,
+                  clip.muted ? '音声なし' : '',
+                  speed !== 1 ? `速度${speed}倍` : '',
+                  dup ? '重複候補' : '',
                 ].filter(Boolean).join(', ');
                 const orig = {inSec: clip.inSec, outSec: clip.outSec, sourceDurationSec: clip.sourceDurationSec, speed};
                 let left = startMs * pxPerMs;
@@ -337,10 +337,10 @@ export const Timeline: React.FC<{playerRef: React.RefObject<PlayerRef | null>}> 
                           key={ki}
                           role="button"
                           tabIndex={0}
-                          aria-label={`Keyframe at ${(k.t - clip.inSec).toFixed(1)}s into ${name} — jump`}
+                          aria-label={`キーフレーム ${name}の${(k.t - clip.inSec).toFixed(1)}秒に移動`}
                           onPointerDown={(e) => { e.stopPropagation(); jump(); }}
                           onKeyDown={keyActivate(jump)}
-                          title="Keyframe — click to jump"
+                          title="キーフレームをクリックして移動"
                           className="absolute bottom-0.5 w-1.5 h-1.5 bg-white rotate-45 -ml-[3px] z-20 cursor-pointer"
                           style={{left: ((k.t - clip.inSec) / speed) * pxPerSec}}
                         />
@@ -363,7 +363,7 @@ export const Timeline: React.FC<{playerRef: React.RefObject<PlayerRef | null>}> 
             </Track>
 
             {/* B-roll track (clip-anchored — follow trims/reorders) */}
-            <Track label="B-roll track">
+            <Track label="追加映像トラック">
               {projBrolls.map((b) => {
                 const sel = b.id === selectedId;
                 const left = b.startMs * pxPerMs;
@@ -375,7 +375,7 @@ export const Timeline: React.FC<{playerRef: React.RefObject<PlayerRef | null>}> 
                     role="button"
                     tabIndex={0}
                     aria-pressed={sel}
-                    aria-label={`B-roll ${b.kind} at ${secs(b.startMs)}: ${b.query ?? b.id}`}
+                    aria-label={`追加映像 ${secs(b.startMs)}: ${b.query ?? b.id}`}
                     data-timeline-block
                     onPointerDown={(e) => { e.stopPropagation(); pick(); }}
                     onKeyDown={keyActivate(pick)}
@@ -395,19 +395,19 @@ export const Timeline: React.FC<{playerRef: React.RefObject<PlayerRef | null>}> 
             </Track>
 
             {/* Audio track (music, with waveform) */}
-            <Track label="Audio track">
+            <Track label="音楽トラック">
               {music ? (
-                <div aria-label={`Music: ${music.src.split('/').pop()}${music.duck ? ', ducking under voice' : ''}`} className="absolute top-2 h-8 rounded flex items-center clip-gradient overflow-hidden bg-on-secondary-fixed-variant/40 border border-secondary/30" style={{left: 0, width: trackWidth}}>
+                <div aria-label={`音楽: ${music.src.split('/').pop()}${music.duck ? '、話し声の間は音量を下げる' : ''}`} className="absolute top-2 h-8 rounded flex items-center clip-gradient overflow-hidden bg-on-secondary-fixed-variant/40 border border-secondary/30" style={{left: 0, width: trackWidth}}>
                   <Wave
                     peaks={slicePeaks(waves[music.src], music.startSec ?? 0, (music.startSec ?? 0) + totalSec)}
                     color="rgba(173,198,255,0.6)"
                   />
                   <span className="px-2 text-[10px] text-secondary-fixed font-bold relative z-10 truncate">
-                    {music.src.split('/').pop()}{music.duck ? ' · ducking' : ''}
+                    {music.src.split('/').pop()}{music.duck ? ' · 話し声で音量を下げる' : ''}
                   </span>
                 </div>
               ) : (
-                <span className="absolute top-3 left-2 text-[10px] text-on-surface-variant/75">No music — add from the Assets panel</span>
+                <span className="absolute top-3 left-2 text-[10px] text-on-surface-variant/75">音楽がありません。左側の「素材」から追加できます</span>
               )}
             </Track>
           </div>

@@ -1,7 +1,7 @@
 {
-  "name": "autobroll",
+  "name": "wanko-shorts-editor",
   "version": "0.4.0",
-  "description": "AI short-form video editor in the browser: auto-arrange takes, cut silence, human-looking captions, auto B-roll, keyframed zoom/pan — built on Remotion.",
+  "description": "犬の動画向け日本語ショート動画編集ツール",
   "license": "MIT",
   "private": true,
   "keywords": [

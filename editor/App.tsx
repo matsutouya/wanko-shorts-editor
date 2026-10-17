@@ -26,7 +26,7 @@ export const App: React.FC = () => {
     try {
       const p = await fetch('/api/projects/' + id).then((r) => r.json());
       init(META0, p.captions ?? [], p.accentColor, p.clips ?? [], p.music ?? null, p.brolls ?? [], p.brollAssets ?? []);
-      setProjectInfo(id, p.name || 'Untitled project');
+      setProjectInfo(id, p.name || '無題のプロジェクト');
       setView('editor');
     } catch {
       /* ignore */
@@ -35,7 +35,7 @@ export const App: React.FC = () => {
 
   // new project: Start already populated clips via upload; assign an id and go
   const newProject = () => {
-    setProjectInfo(`p-${Date.now()}`, 'Untitled project');
+    setProjectInfo(`p-${Date.now()}`, '無題のプロジェクト');
     setView('editor');
   };
 

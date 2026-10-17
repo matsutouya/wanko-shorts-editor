@@ -14,6 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import os from 'node:os';
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 import {z} from 'zod';
@@ -394,6 +395,42 @@ server.registerTool('frame_at', {description: 'Look at a frame. Without `video`:
   if (ff.status !== 0 || !fs.existsSync(out)) throw new Error('ffmpeg could not extract the frame');
   const data = fs.readFileSync(out).toString('base64'); fs.rmSync(out, {force: true});
   return {content: [{type: 'text', text: `${video ? 'rendered' : 'source'} frame @${f1(at_sec)}s`}, {type: 'image', data, mimeType: 'image/jpeg'}]};
+});
+
+server.registerTool('scene_overview', {
+  description: '犬の動画など、話し声がない映像の場面を12枚の静止画で一覧表示します。画像を見て使いたい場面を選びます。',
+  inputSchema: {project_id: pid, clip_id: z.string().optional()},
+}, async ({project_id, clip_id}) => {
+  await needBackend();
+  const project = load(project_id);
+  const clip = clip_id ? project.clips.find((item) => item.id === clip_id) : project.clips[0];
+  if (!clip) throw new Error('動画が見つかりません。clip_id を確認してください');
+  const query = new URLSearchParams({src: clip.src, start: String(clip.inSec), end: String(clip.outSec), count: '12'});
+  const response = await fetch(`${API}/api/scene-frames?${query}`);
+  const result = await response.json();
+  if (!response.ok || !Array.isArray(result.frames) || result.frames.length !== 12) throw new Error(result.error || '場面一覧を作成できませんでした');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wanko-scenes-'));
+  try {
+    result.frames.forEach((frame, index) => {
+      fs.copyFileSync(path.join(PUBLIC, frame.url.replace(/^\//, '')), path.join(dir, `frame-${String(index + 1).padStart(2, '0')}.jpg`));
+    });
+    const out = path.join(dir, 'overview.jpg');
+    const ff = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-framerate', '1', '-start_number', '1',
+      '-i', path.join(dir, 'frame-%02d.jpg'), '-vf', 'scale=180:-2,tile=4x3:nb_frames=12',
+      '-frames:v', '1', '-q:v', '4', '-y', out]);
+    if (ff.status !== 0 || !fs.existsSync(out)) throw new Error('一覧画像を作成できませんでした');
+    const placed = place(project.clips).find((item) => item.clip.id === clip.id);
+    const legend = result.frames.map((frame, index) => {
+      const timeSec = placed.startMs / 1000 + (frame.atSec - clip.inSec) / (clip.speed ?? 1);
+      return `${index + 1}: ${f1(timeSec)}秒`;
+    }).join('、');
+    return {content: [
+      {type: 'text', text: `動画: ${clip.label ?? clip.id}。画像は左上から右へ1～4、次の段に5～8、最後の段に9～12です。タイムライン上の時刻: ${legend}`},
+      {type: 'image', data: fs.readFileSync(out).toString('base64'), mimeType: 'image/jpeg'},
+    ]};
+  } finally {
+    fs.rmSync(dir, {recursive: true, force: true});
+  }
 });
 
 server.registerTool('health', {description: 'Check the AutoBroll environment (backend, ffmpeg, WhisperX, API keys).', inputSchema: {}}, async () => {

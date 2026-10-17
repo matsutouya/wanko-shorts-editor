@@ -39,6 +39,7 @@ type EditorState = {
   setCaptionScale: (id: string, scale: number) => void;
   setBrollScale: (id: string, scale: number) => void;
   setText: (id: string, text: string) => void;
+  setManualCaptionDuration: (id: string, durationSec: number) => void;
   toggleAccent: (id: string, wordIndex: number) => void;
 
   // clips track (multi-clip timeline)
@@ -94,7 +95,7 @@ const mapCap = (caps: Caption[], id: string, fn: (c: Caption) => Caption) =>
 export const useEditor = create<EditorState>((set) => ({
   meta: null,
   projectId: null,
-  projectName: 'Untitled project',
+  projectName: '無題のプロジェクト',
   captions: [],
   clips: [],
   music: null,
@@ -112,7 +113,7 @@ export const useEditor = create<EditorState>((set) => ({
     set((s) => ({
       meta: withMeta(meta, clips),
       projectId: null, // caller assigns via setProjectInfo — prevents autosaving a cleared state into the old project
-      projectName: 'Untitled project',
+      projectName: '無題のプロジェクト',
       captions,
       clips,
       music,
@@ -148,6 +149,16 @@ export const useEditor = create<EditorState>((set) => ({
           accent: accented.has(t.toLowerCase()),
         }));
         return {...c, words};
+      }),
+    })),
+  setManualCaptionDuration: (id, durationSec) =>
+    set((s) => ({
+      captions: mapCap(s.captions, id, (c) => {
+        if (!c.id.startsWith('manual-') || !c.clipId) return c;
+        const clip = s.clips.find((item) => item.id === c.clipId);
+        if (!clip) return c;
+        const endMs = Math.min(clip.outSec * 1000, c.startMs + Math.max(0.5, durationSec) * 1000 * (clip.speed ?? 1));
+        return {...c, endMs, words: c.words.map((w) => ({...w, endMs}))};
       }),
     })),
 

@@ -12,6 +12,7 @@ import {spawn} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import {createHash} from 'node:crypto';
 
 // run a command async, resolve {code, stdout, stderr}
 const run = (cmd, args, opts = {}) =>
@@ -145,6 +146,38 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
 
   if (req.method === 'GET' && url.pathname === '/api/health') return json(res, 200, await health());
+
+  // Build a visual overview of a source clip without speech recognition or API keys.
+  if (req.method === 'GET' && url.pathname === '/api/scene-frames') {
+    const src = url.searchParams.get('src') || '';
+    const start = Number(url.searchParams.get('start'));
+    const end = Number(url.searchParams.get('end'));
+    const count = Number(url.searchParams.get('count'));
+    if (!/^clips\/[\w.-]+\.mp4$/.test(src) || !Number.isFinite(start) || !Number.isFinite(end) ||
+        start < 0 || end <= start || end > 86400 || !Number.isInteger(count) || count < 1 || count > 24) {
+      return json(res, 400, {error: '動画の範囲が正しくありません'});
+    }
+    const input = path.join(PUBLIC, src);
+    if (!fs.existsSync(input)) return json(res, 404, {error: '動画ファイルが見つかりません'});
+    const dir = path.join(PUBLIC, 'scene-frames');
+    fs.mkdirSync(dir, {recursive: true});
+    const frames = [];
+    for (let i = 0; i < count; i++) {
+      const atSec = start + ((i + 0.5) * (end - start)) / count;
+      const key = createHash('sha1').update(`${src}:${atSec.toFixed(3)}`).digest('hex').slice(0, 20);
+      const file = path.join(dir, `${key}.jpg`);
+      if (!fs.existsSync(file)) {
+        const result = await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-ss', atSec.toFixed(3), '-i', input,
+          '-frames:v', '1', '-vf', 'scale=320:-2', '-q:v', '4', '-y', file]);
+        if (result.code !== 0 || !fs.existsSync(file)) {
+          fs.rmSync(file, {force: true});
+          return json(res, 500, {error: '静止画の作成に失敗しました'});
+        }
+      }
+      frames.push({atSec, url: `/scene-frames/${key}.jpg`});
+    }
+    return json(res, 200, {frames});
+  }
 
   // ---- multi-project library ----
   if (req.method === 'GET' && url.pathname === '/api/projects') {
@@ -428,10 +461,17 @@ const server = createServer(async (req, res) => {
     // Draft: half resolution + ultrafast — for quick checks, ~40% faster.
     // scale to the machine: leave 2 cores for the browser/encoder, cap the
     // OffthreadVideo cache at a quarter of RAM (max 4 GB)
-    const concurrency = Math.max(2, Math.min(16, os.cpus().length - 2));
+    const concurrency = Math.max(2, Math.min(4, os.cpus().length - 2));
     const cacheBytes = Math.min(4e9, Math.max(5e8, Math.floor(os.totalmem() / 4)));
+    const browserCandidates = [
+      process.env.REMOTION_BROWSER_EXECUTABLE,
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Chromium.app/Contents/MacOS/Chromium',
+    ];
+    const browserExecutable = browserCandidates.find((candidate) => candidate && fs.existsSync(candidate));
     const args = [
       'remotion', 'render', 'MultiClip', outFile, `--props=${propsFile}`,
+      ...(browserExecutable ? [`--browser-executable=${browserExecutable}`] : []),
       `--concurrency=${concurrency}`,
       `--x264-preset=${draft ? 'ultrafast' : 'veryfast'}`,
       `--offthreadvideo-cache-size-in-bytes=${cacheBytes}`,
